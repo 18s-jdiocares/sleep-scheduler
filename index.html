@@ -138,7 +138,7 @@
           <h1 class="text-2xl font-bold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             Sleep Sync
           </h1>
-          <p class="text-xs font-light text-slate-300">Parameters: 15m latency · 90m cycle · Integrated Nap Deficit Protocol</p>
+          <p id="app-params-subtitle" class="text-xs font-light text-slate-300">Parameters: 15m latency · Dynamic Phase Cycles · Integrated Nap Deficit Protocol</p>
         </div>
       </div>
       
@@ -156,7 +156,7 @@
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/10 pb-4">
         <div>
           <h2 class="text-base font-bold text-white uppercase tracking-wide">Interactive Sleep & Nap Optimizer</h2>
-          <p class="text-xs font-light text-slate-300">Selecting a wake-up time automatically pairs nightly sleep with daytime nap recommendations.</p>
+          <p class="text-xs font-light text-slate-300">Upload Apple Health export XML or calibrate parameters manually below.</p>
         </div>
         <div class="flex items-center gap-2 glossy-pill-dark px-3 py-1 rounded-full text-[11px] text-slate-200">
           <span id="auto-badge-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse"></span>
@@ -165,7 +165,7 @@
       </div>
 
       <!-- Controls Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- Dropdown 1: Target Wake Up Time -->
         <div class="space-y-1.5">
@@ -216,14 +216,28 @@
           </label>
           <div class="relative">
             <select id="variant-select" class="aero-select-dark w-full rounded-xl px-3 py-2.5 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-400 appearance-none transition-all cursor-pointer">
-              <option value="full" selected>Clean Cycle Exit (End/Start 0-10m / 80-90m)</option>
-              <option value="rem">REM / Mid-Late Exit (Mins 40-80 - Cycles 5-6)</option>
-              <option value="early">Early Cycle Exit (Mins 15-30 - Cycles 1-3)</option>
+              <option value="full" selected>Clean Cycle Exit (End/Start Core Sleep)</option>
+              <option value="rem">REM / Mid-Late Exit (Cycles 4–6)</option>
+              <option value="early">Early Cycle Exit (Pre-Deep - Cycles 1–3)</option>
             </select>
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
               <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
             </div>
           </div>
+        </div>
+
+        <!-- Control 4: Apple Health File Import -->
+        <div class="space-y-1.5">
+          <label for="health-file-input" class="block text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center justify-between">
+            <span>4. Apple Health Data</span>
+            <span id="data-status-tag" class="text-[10px] text-slate-400 font-normal">Default Standard</span>
+          </label>
+          <input 
+            type="file" 
+            id="health-file-input" 
+            accept=".xml" 
+            class="aero-input-dark w-full rounded-xl px-2.5 py-2 text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all cursor-pointer file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
+          >
         </div>
 
       </div>
@@ -232,7 +246,7 @@
       <div id="recommendation-banner" class="glossy-banner rounded-xl p-5 backdrop-blur-md">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-sky-300">30-Minute Target Bedtime Window</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-300">Target Bedtime Window</span>
             <div id="bedtime-display" class="text-2xl md:text-4xl font-bold text-white font-mono tracking-tight mt-0.5 drop-shadow-[0_2px_8px_rgba(56,189,248,0.5)]">
               --:-- - --:--
             </div>
@@ -258,20 +272,13 @@
           </span>
         </div>
         
-        <!-- Safety Visualizer Bar -->
+        <!-- Dynamic Visualizer Bar -->
         <div class="space-y-1 pt-1">
-          <div class="h-3 w-full bg-slate-950/80 rounded-full border border-white/15 overflow-hidden flex relative shadow-inner">
-            <div class="h-full bg-gradient-to-r from-sky-600 to-sky-400 w-[16.7%]" title="Light Core / Stage N1 (0-15m)"></div>
-            <div class="h-full bg-gradient-to-r from-rose-600 to-red-500 w-[22.2%]" title="Deep Sleep Hazard (15m-35m / 30m-55m in early cycles)"></div>
-            <div class="h-full bg-gradient-to-r from-purple-600 to-indigo-400 w-[50.0%]" title="Active REM Sleep (40m-80m)"></div>
-            <div class="h-full bg-gradient-to-r from-emerald-600 to-teal-400 w-[11.1%]" title="Late Core Transition (80m-90m)"></div>
-            <div id="wake-marker" class="absolute top-0 bottom-0 w-1.5 bg-yellow-300 shadow-[0_0_10px_#fde047] border-x border-amber-400 transition-all duration-300" style="left: 0%;"></div>
+          <div id="visualizer-bar" class="h-3 w-full bg-slate-950/80 rounded-full border border-white/15 overflow-hidden flex relative shadow-inner">
+            <!-- Dynamic segments rendered by JS -->
           </div>
-          <div class="flex justify-between text-[10px] font-mono font-bold text-slate-400">
-            <span>0m (Cycle Start)</span>
-            <span class="text-rose-400">15m-35m (Core/Deep Inertia Zone)</span>
-            <span class="text-purple-300">40m-80m (REM Phase)</span>
-            <span>90m (Cycle End)</span>
+          <div id="visualizer-labels" class="flex justify-between text-[10px] font-mono font-bold text-slate-400">
+            <!-- Dynamic labels rendered by JS -->
           </div>
         </div>
       </div>
@@ -346,32 +353,63 @@
   </div>
 
   <footer class="text-center text-xs font-light text-slate-400 mt-8 mb-4">
-    Dark Frutiger Aero Edition · Standard 90-Minute Sleep Cycle Model
+    Dark Frutiger Aero Edition · Personal Adaptive Sleep Architecture Model
   </footer>
 
   <!-- App Script Engine -->
   <script>
-    const LATENCY = 15;
-    const CYCLE_LEN = 90;
-    const EARLY_EXIT = 20; // Minutes 15-30 for early cycles
-    const REM_EXIT = 60;   // Minutes 40-80 for late cycles (5-6)
-
-    const VARIANT_DESCS = {
-      full: "Clean Cycle Exit. Wakes at minute 85-90 or 0-10 of next cycle (Core sleep) to maximize alertness.",
-      rem: "REM / Mid-Late Exit. Wakes in minutes 40-80 during active dreaming phase in Cycles 5-6 (zero physical repair penalty).",
-      early: "Early Cycle Exit. Wakes in minutes 15-30 during early cycles to pull out right before heavy Deep sleep hits."
+    // Personal adaptive sleep profile parameters
+    let userSleepProfile = {
+      avgLatency: 15,
+      earlyCycleLen: 95,      // Cycles 1–3 average length
+      lateCycleLen: 90,       // Cycles 4–6 average length
+      earlyDeepStart: 20,     // Deep sleep start in early cycles (mins)
+      earlyDeepEnd: 55,       // Deep sleep end in early cycles (mins)
+      lateRemStart: 35,       // REM start in late cycles (mins)
+      lateRemEnd: 80,         // REM end in late cycles (mins)
+      isCalibrated: false
     };
 
     let userOverride = false;
 
+    const VARIANT_DESCS = {
+      full: "Clean Cycle Exit. Targets light Core sleep at the cycle boundary to eliminate waking grogginess.",
+      rem: "REM / Mid-Late Exit. Wakes in the active dreaming phase of late cycles (4–6) with zero deep-sleep inertia.",
+      early: "Early Cycle Exit. Wakes before deep sleep (N3) begins in early cycles (1–3) to prevent heavy brain fog."
+    };
+
+    // Calculate duration considering early vs late cycle differences
+    function getCycleLength(cycleIndex) {
+      return cycleIndex <= 3 ? userSleepProfile.earlyCycleLen : userSleepProfile.lateCycleLen;
+    }
+
     function calculateDurationMinutes(cycles, variant) {
-      if (variant === 'full') {
-        return LATENCY + (cycles * CYCLE_LEN);
-      } else if (variant === 'rem') {
-        return LATENCY + ((cycles - 1) * CYCLE_LEN) + REM_EXIT;
-      } else {
-        return LATENCY + ((cycles - 1) * CYCLE_LEN) + EARLY_EXIT;
+      let total = userSleepProfile.avgLatency;
+
+      for (let c = 1; c <= cycles; c++) {
+        const cLen = getCycleLength(c);
+        if (c < cycles) {
+          total += cLen;
+        } else {
+          // Final cycle exit rule
+          if (variant === 'full') {
+            total += cLen;
+          } else if (variant === 'rem') {
+            if (c <= 3) {
+              // Mid-exit early cycle: exit right after deep sleep phase
+              total += Math.min(userSleepProfile.earlyDeepEnd + 10, cLen - 10);
+            } else {
+              // Late cycle: exit mid-REM
+              const remMid = Math.round((userSleepProfile.lateRemStart + userSleepProfile.lateRemEnd) / 2);
+              total += remMid;
+            }
+          } else if (variant === 'early') {
+            // Exit early before deep sleep
+            total += Math.max(15, userSleepProfile.earlyDeepStart - 5);
+          }
+        }
       }
+      return total;
     }
 
     function formatTime12(hours, minutes) {
@@ -420,6 +458,61 @@
       });
 
       return bestCombination;
+    }
+
+    function renderVisualizer(cycles, variant) {
+      const bar = document.getElementById('visualizer-bar');
+      const labels = document.getElementById('visualizer-labels');
+      const isEarlyGroup = cycles <= 3;
+      const cLen = isEarlyGroup ? userSleepProfile.earlyCycleLen : userSleepProfile.lateCycleLen;
+
+      let exitOffset = cLen;
+      if (variant === 'early') exitOffset = Math.max(15, userSleepProfile.earlyDeepStart - 5);
+      if (variant === 'rem') {
+        exitOffset = isEarlyGroup 
+          ? Math.min(userSleepProfile.earlyDeepEnd + 10, cLen - 10)
+          : Math.round((userSleepProfile.lateRemStart + userSleepProfile.lateRemEnd) / 2);
+      }
+
+      const markerPct = Math.min(100, (exitOffset / cLen) * 100);
+
+      if (isEarlyGroup) {
+        // Render Early Cycle Phase Layout (Front-loaded Deep Sleep)
+        const p1 = (userSleepProfile.earlyDeepStart / cLen) * 100;
+        const p2 = ((userSleepProfile.earlyDeepEnd - userSleepProfile.earlyDeepStart) / cLen) * 100;
+        const p3 = 100 - p1 - p2;
+
+        bar.innerHTML = `
+          <div class="h-full bg-gradient-to-r from-sky-600 to-sky-400" style="width: ${p1}%" title="Light Core (0-${userSleepProfile.earlyDeepStart}m)"></div>
+          <div class="h-full bg-gradient-to-r from-rose-600 to-red-500" style="width: ${p2}%" title="Deep Sleep Zone (${userSleepProfile.earlyDeepStart}m-${userSleepProfile.earlyDeepEnd}m)"></div>
+          <div class="h-full bg-gradient-to-r from-emerald-600 to-teal-400" style="width: ${p3}%" title="Late Transition (${userSleepProfile.earlyDeepEnd}m-${cLen}m)"></div>
+          <div id="wake-marker" class="absolute top-0 bottom-0 w-1.5 bg-yellow-300 shadow-[0_0_10px_#fde047] border-x border-amber-400 transition-all duration-300" style="left: ${markerPct}%;"></div>
+        `;
+
+        labels.innerHTML = `
+          <span>0m</span>
+          <span class="text-rose-400">${userSleepProfile.earlyDeepStart}m–${userSleepProfile.earlyDeepEnd}m (Deep Sleep)</span>
+          <span>${cLen}m (Cycle End)</span>
+        `;
+      } else {
+        // Render Late Cycle Phase Layout (Expanded REM, Minimal Deep)
+        const p1 = (userSleepProfile.lateRemStart / cLen) * 100;
+        const p2 = ((userSleepProfile.lateRemEnd - userSleepProfile.lateRemStart) / cLen) * 100;
+        const p3 = 100 - p1 - p2;
+
+        bar.innerHTML = `
+          <div class="h-full bg-gradient-to-r from-sky-600 to-sky-400" style="width: ${p1}%" title="Light Core (0-${userSleepProfile.lateRemStart}m)"></div>
+          <div class="h-full bg-gradient-to-r from-purple-600 to-indigo-400" style="width: ${p2}%" title="Active REM Phase (${userSleepProfile.lateRemStart}m-${userSleepProfile.lateRemEnd}m)"></div>
+          <div class="h-full bg-gradient-to-r from-emerald-600 to-teal-400" style="width: ${p3}%" title="Late Core Transition (${userSleepProfile.lateRemEnd}m-${cLen}m)"></div>
+          <div id="wake-marker" class="absolute top-0 bottom-0 w-1.5 bg-yellow-300 shadow-[0_0_10px_#fde047] border-x border-amber-400 transition-all duration-300" style="left: ${markerPct}%;"></div>
+        `;
+
+        labels.innerHTML = `
+          <span>0m</span>
+          <span class="text-purple-300">${userSleepProfile.lateRemStart}m–${userSleepProfile.lateRemEnd}m (REM Phase)</span>
+          <span>${cLen}m (Cycle End)</span>
+        `;
+      }
     }
 
     function renderNapStrategy(cycles, wakeTotalMinutes) {
@@ -579,10 +672,10 @@
         safetyBadge.textContent = '✓ Ideal Core Exit (0 Groggy Inertia)';
         safetyBadge.className = 'text-emerald-300 font-bold font-mono text-[11px] bg-emerald-950/80 border border-emerald-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)]';
       } else if (variant === 'rem') {
-        safetyBadge.textContent = '✓ High Brain Activity (Cycles 5-6 Only)';
+        safetyBadge.textContent = '✓ High Brain Activity Exit';
         safetyBadge.className = 'text-purple-300 font-bold font-mono text-[11px] bg-purple-950/80 border border-purple-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.3)]';
       } else {
-        safetyBadge.textContent = '⚠ Exit Pre-Deep Sleep (Cycles 1-3)';
+        safetyBadge.textContent = '⚠ Pre-Deep Exit (Cycles 1–3)';
         safetyBadge.className = 'text-amber-300 font-bold font-mono text-[11px] bg-amber-950/80 border border-amber-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.3)]';
       }
 
@@ -604,14 +697,65 @@
         statusEl.className = 'text-xs text-slate-400 mt-1 font-bold font-mono';
       }
 
-      const marker = document.getElementById('wake-marker');
-      let offset = CYCLE_LEN;
-      if (variant === 'early') offset = EARLY_EXIT;
-      if (variant === 'rem') offset = REM_EXIT;
-      const offsetPct = (offset / CYCLE_LEN) * 100;
-      marker.style.left = `${offsetPct}%`;
-
+      renderVisualizer(cycles, variant);
       renderNapStrategy(cycles, wakeTotalMinutes);
+    }
+
+    // Process Apple Health Sleep XML Records
+    function processAppleHealthXML(xmlText) {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        const records = xmlDoc.querySelectorAll('Record[type*="SleepAnalysis"]');
+
+        if (!records || records.length === 0) {
+          alert("No sleep records found in the uploaded file.");
+          return;
+        }
+
+        let deepCount = 0, deepTotalMins = 0;
+        let remCount = 0, remTotalMins = 0;
+
+        records.forEach(r => {
+          const val = r.getAttribute('value') || '';
+          const start = new Date(r.getAttribute('startDate'));
+          const end = new Date(r.getAttribute('endDate'));
+          const duration = (end - start) / (1000 * 60);
+
+          if (duration > 0 && duration < 180) {
+            if (val.includes('AsleepDeep') || val.includes('HKCategoryValueSleepAnalysisAsleepDeep')) {
+              deepCount++;
+              deepTotalMins += duration;
+            } else if (val.includes('AsleepREM') || val.includes('HKCategoryValueSleepAnalysisAsleepREM')) {
+              remCount++;
+              remTotalMins += duration;
+            }
+          }
+        });
+
+        if (deepCount > 0) {
+          const avgDeep = deepTotalMins / deepCount;
+          userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
+        }
+
+        if (remCount > 0) {
+          const avgRem = remTotalMins / remCount;
+          userSleepProfile.lateRemEnd = Math.min(85, Math.max(55, Math.round(35 + avgRem)));
+        }
+
+        userSleepProfile.isCalibrated = true;
+        
+        document.getElementById('data-status-tag').textContent = "Apple Health Active";
+        document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
+        document.getElementById('auto-badge-text').textContent = "Calibrated to Apple Health Data";
+        document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
+        document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated Apple Health Architecture · Dynamic Cycles";
+
+        updateCalculations(true);
+
+      } catch (err) {
+        alert("Unable to parse Apple Health XML. Ensure you upload export.xml from Apple Health.");
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -623,6 +767,15 @@
       const selectEl = document.getElementById('wake-time-select');
       const customContainer = document.getElementById('custom-time-container');
       const customInput = document.getElementById('custom-wake-input');
+      const fileInput = document.getElementById('health-file-input');
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => processAppleHealthXML(evt.target.result);
+        reader.readAsText(file);
+      });
 
       selectEl.addEventListener('change', () => {
         if (selectEl.value === 'custom') {
@@ -631,15 +784,15 @@
           customContainer.classList.add('hidden');
         }
         userOverride = false;
-        document.getElementById('auto-badge-text').textContent = "Auto-Matched to Current Time";
-        document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
+        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Apple Health Data" : "Auto-Matched to Current Time";
+        document.getElementById('auto-badge-dot').className = userSleepProfile.isCalibrated ? "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse" : "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
         updateCalculations(true);
       });
 
       customInput.addEventListener('change', () => {
         userOverride = false;
-        document.getElementById('auto-badge-text').textContent = "Auto-Matched to Current Time";
-        document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
+        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Apple Health Data" : "Auto-Matched to Current Time";
+        document.getElementById('auto-badge-dot').className = userSleepProfile.isCalibrated ? "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse" : "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
         updateCalculations(true);
       });
 
