@@ -41,7 +41,7 @@
     }
 
     /* Monospace Overrides for explicit display targets */
-    .font-mono, code, pre, #live-clock, #bedtime-display, #duration-display, #minute-count, #time-diff-status, .glossy-pill-dark, th, td {
+    .font-mono, code, pre, #live-clock, #bedtime-display, #avoid-bedtime-display, #duration-display, #minute-count, #time-diff-status, .glossy-pill-dark, th, td {
       font-family: "JetBrains Mono", Consolas, monospace !important;
     }
 
@@ -102,6 +102,12 @@
       background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(16, 185, 129, 0.15) 100%);
       border: 1px solid rgba(255, 255, 255, 0.2);
       box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .glossy-banner-hazard {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.18) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(225, 29, 72, 0.2) 100%);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.4);
     }
 
     .bubble-dark {
@@ -175,6 +181,7 @@
               <option value="05:30">5:30 AM</option>
               <option value="05:45">5:45 AM</option>
               <option value="06:00">6:00 AM</option>
+              <option value="07:30">7:30 AM</option>
               <option value="custom">Custom Time...</option>
             </select>
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
@@ -182,7 +189,7 @@
             </div>
           </div>
           <div id="custom-time-container" class="hidden pt-1">
-            <input type="time" id="custom-wake-input" value="07:00" class="aero-input-dark w-full rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all cursor-pointer">
+            <input type="time" id="custom-wake-input" value="07:30" class="aero-input-dark w-full rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-400 transition-all cursor-pointer">
           </div>
         </div>
 
@@ -242,7 +249,7 @@
       <div id="recommendation-banner" class="glossy-banner rounded-xl p-5 backdrop-blur-md">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-sky-300">Target Bedtime Window</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-300">Recommended Bedtime Window</span>
             <div id="bedtime-display" class="text-2xl md:text-4xl font-bold text-white font-mono tracking-tight mt-0.5 drop-shadow-[0_2px_8px_rgba(56,189,248,0.5)]">
               --:-- - --:--
             </div>
@@ -255,6 +262,30 @@
               -- h -- m
             </div>
             <span id="minute-count" class="text-xs font-mono font-light text-slate-300 block">(-- minutes)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW: Avoid Bedtime Hazard Window Banner -->
+      <div id="hazard-banner" class="glossy-banner-hazard rounded-xl p-5 backdrop-blur-md">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shadow-[0_0_8px_#f43f5e]"></span>
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-300">Avoid Falling Asleep Window (Inertia Zone)</span>
+            </div>
+            <div id="avoid-bedtime-display" class="text-2xl md:text-3xl font-bold text-rose-200 font-mono tracking-tight mt-1 drop-shadow-[0_2px_8px_rgba(244,63,94,0.5)]">
+              --:-- - --:--
+            </div>
+            <p id="avoid-status-desc" class="text-xs text-rose-300/90 mt-1 font-light">
+              Falling asleep during this window causes your wake-up alarm to hit mid-Core/Deep sleep (15–35m mark).
+            </p>
+          </div>
+
+          <div class="border-t md:border-t-0 md:border-l border-rose-500/20 pt-3 md:pt-0 md:pl-6 w-full md:w-auto">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-rose-300 block">Hazard Impact</span>
+            <span class="text-xs font-bold text-white block mt-0.5">Severe Grogginess</span>
+            <span class="text-[11px] font-mono text-rose-200/80 block">Triggers Sleep Inertia</span>
           </div>
         </div>
       </div>
@@ -397,6 +428,22 @@
           } else if (variant === 'early') {
             total += Math.max(15, userSleepProfile.earlyDeepStart - 5);
           }
+        }
+      }
+      return total;
+    }
+
+    // Calculates the duration that forces waking during the bad inertia zone (15m-35m of final cycle)
+    function calculateHazardDurationMinutes(cycles) {
+      let total = userSleepProfile.avgLatency;
+
+      for (let c = 1; c <= cycles; c++) {
+        const cLen = getCycleLength(c);
+        if (c < cycles) {
+          total += cLen;
+        } else {
+          // Target minute 25 of the final cycle (peak inertia zone)
+          total += 25; 
         }
       }
       return total;
@@ -615,7 +662,7 @@
       let wakeVal = selectVal;
 
       if (selectVal === 'custom') {
-        wakeVal = document.getElementById('custom-wake-input').value || '07:00';
+        wakeVal = document.getElementById('custom-wake-input').value || '07:30';
       }
 
       const [wHour, wMin] = wakeVal.split(':').map(Number);
@@ -633,6 +680,7 @@
       const cycles = parseInt(cycleSelect.value);
       const variant = variantSelect.value;
 
+      // Recommended Bedtime Calculation
       const durationMinutes = calculateDurationMinutes(cycles, variant);
 
       let midBedtimeMinutes = (wakeTotalMinutes - durationMinutes) % 1440;
@@ -654,6 +702,25 @@
       document.getElementById('duration-display').textContent = formatDuration(durationMinutes);
       document.getElementById('minute-count').textContent = `(${durationMinutes} total mins in bed)`;
       document.getElementById('strategy-desc').textContent = VARIANT_DESCS[variant];
+
+      // NEW: Avoid Bedtime Hazard Window Calculation
+      const hazardDurationMins = calculateHazardDurationMinutes(cycles);
+      let midHazardBedtime = (wakeTotalMinutes - hazardDurationMins) % 1440;
+      if (midHazardBedtime < 0) midHazardBedtime += 1440;
+
+      let startHazardBedtime = (midHazardBedtime - 10) % 1440;
+      if (startHazardBedtime < 0) startHazardBedtime += 1440;
+
+      let endHazardBedtime = (midHazardBedtime + 10) % 1440;
+      if (endHazardBedtime < 0) endHazardBedtime += 1440;
+
+      const hStartHour = Math.floor(startHazardBedtime / 60);
+      const hStartMin = startHazardBedtime % 60;
+      const hEndHour = Math.floor(endHazardBedtime / 60);
+      const hEndMin = endHazardBedtime % 60;
+
+      const avoidRangeStr = `${formatTime12(hStartHour, hStartMin)} – ${formatTime12(hEndHour, hEndMin)}`;
+      document.getElementById('avoid-bedtime-display').textContent = avoidRangeStr;
 
       const safetyBadge = document.getElementById('safety-badge');
       if (variant === 'full') {
@@ -689,33 +756,29 @@
       renderNapStrategy(cycles, wakeTotalMinutes);
     }
 
-    // High-performance streaming chunk scanner for massive XML files
-    // High-performance streaming chunk scanner restricted to the last 30 days of data
     async function processStreamingAppleHealthXML(file) {
-      const CHUNK_SIZE = 1024 * 64; // 64KB per chunk
+      const CHUNK_SIZE = 1024 * 64;
       let offset = 0;
       let totalBytes = file.size;
       
       let deepCount = 0, deepTotalMins = 0;
       let remCount = 0, remTotalMins = 0;
       let sleepTagMatches = 0;
-    
+
       const tagCounts = {};
       let leftover = "";
-    
-      // Set cutoff date to exactly 30 days ago from today
+
       const NOW = new Date();
       const CUTOFF_DATE = new Date(NOW.setDate(NOW.getDate() - 30));
-    
+
       document.getElementById('data-status-tag').textContent = "Scanning Last 30 Days...";
       document.getElementById('data-status-tag').className = "text-[10px] text-amber-300 font-bold animate-pulse";
-    
+
       while (offset < totalBytes) {
         const slice = file.size ? file.slice(offset, offset + CHUNK_SIZE) : file;
         const chunkText = await slice.text();
         const textToScan = leftover + chunkText;
-    
-        // Diagnostic tracker for generic records
+
         const tagMatches = textToScan.match(/<Record[^>]*type=["']([^"']+)["']/gi);
         if (tagMatches) {
           tagMatches.forEach(tm => {
@@ -723,25 +786,23 @@
             tagCounts[typeVal] = (tagCounts[typeVal] || 0) + 1;
           });
         }
-    
-        // Broad sleep scanner matching Apple Health sleep formats
+
         const recordMatches = textToScan.match(/<Record[^>]*SleepAnalysis[^>]*>/gi);
         if (recordMatches) {
           recordMatches.forEach(tag => {
             const valMatch = tag.match(/value=["']([^"']+)["']/i);
             const startMatch = tag.match(/startDate=["']([^"']+)["']/i);
             const endMatch = tag.match(/endDate=["']([^"']+)["']/i);
-    
+
             if (startMatch && endMatch) {
               const start = new Date(startMatch[1]);
               const end = new Date(endMatch[1]);
-    
-              // Strict 30-day filter check
+
               if (start >= CUTOFF_DATE) {
                 sleepTagMatches++;
                 const val = (valMatch ? valMatch[1] : '').toLowerCase();
                 const duration = (end - start) / (1000 * 60);
-    
+
                 if (duration > 0 && duration < 720) {
                   if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
                     deepCount++;
@@ -755,49 +816,48 @@
             }
           });
         }
-    
-        // Carry over incomplete trailing tag boundary
+
         const lastPos = textToScan.lastIndexOf('<');
         if (lastPos !== -1 && lastPos > textToScan.length - 250) {
           leftover = textToScan.slice(lastPos);
         } else {
           leftover = "";
         }
-    
+
         offset += CHUNK_SIZE;
       }
-    
+
       if (sleepTagMatches === 0) {
         const topTypes = Object.entries(tagCounts)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([type, count]) => `• ${type} (${count} entries)`)
           .join('\n');
-    
+
         alert(`No sleep records found within the last 30 days.\n\nTop health categories found in file:\n${topTypes || "None"}`);
         document.getElementById('data-status-tag').textContent = "No Recent Data";
         document.getElementById('data-status-tag').className = "text-[10px] text-rose-400 font-bold";
         return;
       }
-    
+
       if (deepCount > 0) {
         const avgDeep = deepTotalMins / deepCount;
         userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
       }
-    
+
       if (remCount > 0) {
         const avgRem = remTotalMins / remCount;
         userSleepProfile.lateRemEnd = Math.min(85, Math.max(55, Math.round(35 + avgRem)));
       }
-    
+
       userSleepProfile.isCalibrated = true;
-    
+
       document.getElementById('data-status-tag').textContent = "Last 30 Days Active";
       document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
       document.getElementById('auto-badge-text').textContent = "Calibrated to Last 30 Days";
       document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
       document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated to Recent 30-Day Sleep Architecture";
-    
+
       updateCalculations(true);
       alert(`Success! Processed ${sleepTagMatches} sleep entries from the past 30 days.`);
     }
@@ -826,14 +886,14 @@
           customContainer.classList.add('hidden');
         }
         userOverride = false;
-        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Apple Health Data" : "Auto-Matched to Current Time";
+        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Last 30 Days" : "Auto-Matched to Current Time";
         document.getElementById('auto-badge-dot').className = userSleepProfile.isCalibrated ? "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse" : "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
         updateCalculations(true);
       });
 
       customInput.addEventListener('change', () => {
         userOverride = false;
-        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Apple Health Data" : "Auto-Matched to Current Time";
+        document.getElementById('auto-badge-text').textContent = userSleepProfile.isCalibrated ? "Calibrated to Last 30 Days" : "Auto-Matched to Current Time";
         document.getElementById('auto-badge-dot').className = userSleepProfile.isCalibrated ? "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse" : "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse";
         updateCalculations(true);
       });
