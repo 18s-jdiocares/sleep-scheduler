@@ -690,6 +690,7 @@
     }
 
     // High-performance streaming chunk scanner for massive XML files
+    // High-performance streaming chunk scanner restricted to the last 30 days of data
     async function processStreamingAppleHealthXML(file) {
       const CHUNK_SIZE = 1024 * 64; // 64KB per chunk
       let offset = 0;
@@ -698,19 +699,23 @@
       let deepCount = 0, deepTotalMins = 0;
       let remCount = 0, remTotalMins = 0;
       let sleepTagMatches = 0;
-
+    
       const tagCounts = {};
       let leftover = "";
-
-      document.getElementById('data-status-tag').textContent = "Scanning File...";
+    
+      // Set cutoff date to exactly 30 days ago from today
+      const NOW = new Date();
+      const CUTOFF_DATE = new Date(NOW.setDate(NOW.getDate() - 30));
+    
+      document.getElementById('data-status-tag').textContent = "Scanning Last 30 Days...";
       document.getElementById('data-status-tag').className = "text-[10px] text-amber-300 font-bold animate-pulse";
-
+    
       while (offset < totalBytes) {
-        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        const slice = file.size ? file.slice(offset, offset + CHUNK_SIZE) : file;
         const chunkText = await slice.text();
         const textToScan = leftover + chunkText;
-
-        // Diagnostic tag tracker
+    
+        // Diagnostic tracker for generic records
         const tagMatches = textToScan.match(/<Record[^>]*type=["']([^"']+)["']/gi);
         if (tagMatches) {
           tagMatches.forEach(tm => {
@@ -718,79 +723,83 @@
             tagCounts[typeVal] = (tagCounts[typeVal] || 0) + 1;
           });
         }
-
-        // Broad sleep scanner matching all Apple Health sleep formats
+    
+        // Broad sleep scanner matching Apple Health sleep formats
         const recordMatches = textToScan.match(/<Record[^>]*SleepAnalysis[^>]*>/gi);
         if (recordMatches) {
-          sleepTagMatches += recordMatches.length;
           recordMatches.forEach(tag => {
             const valMatch = tag.match(/value=["']([^"']+)["']/i);
             const startMatch = tag.match(/startDate=["']([^"']+)["']/i);
             const endMatch = tag.match(/endDate=["']([^"']+)["']/i);
-
+    
             if (startMatch && endMatch) {
-              const val = (valMatch ? valMatch[1] : '').toLowerCase();
               const start = new Date(startMatch[1]);
               const end = new Date(endMatch[1]);
-              const duration = (end - start) / (1000 * 60);
-
-              if (duration > 0 && duration < 720) {
-                if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
-                  deepCount++;
-                  deepTotalMins += duration;
-                } else if (val.includes('rem') || val.includes('asleeprem') || val === '4') {
-                  remCount++;
-                  remTotalMins += duration;
+    
+              // Strict 30-day filter check
+              if (start >= CUTOFF_DATE) {
+                sleepTagMatches++;
+                const val = (valMatch ? valMatch[1] : '').toLowerCase();
+                const duration = (end - start) / (1000 * 60);
+    
+                if (duration > 0 && duration < 720) {
+                  if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
+                    deepCount++;
+                    deepTotalMins += duration;
+                  } else if (val.includes('rem') || val.includes('asleeprem') || val === '4') {
+                    remCount++;
+                    remTotalMins += duration;
+                  }
                 }
               }
             }
           });
         }
-
-        // Carry over last incomplete tag boundary
+    
+        // Carry over incomplete trailing tag boundary
         const lastPos = textToScan.lastIndexOf('<');
         if (lastPos !== -1 && lastPos > textToScan.length - 250) {
           leftover = textToScan.slice(lastPos);
         } else {
           leftover = "";
         }
-
+    
         offset += CHUNK_SIZE;
       }
-
+    
       if (sleepTagMatches === 0) {
         const topTypes = Object.entries(tagCounts)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([type, count]) => `• ${type} (${count} entries)`)
           .join('\n');
-
-        alert(`Scanned entire file, but no SleepAnalysis records were found.\n\nTop health categories found in your file:\n${topTypes || "None (File might be empty or formatted differently)"}\n\nMake sure your Apple Health export includes sleep data!`);
-        document.getElementById('data-status-tag').textContent = "No Sleep Data";
+    
+        alert(`No sleep records found within the last 30 days.\n\nTop health categories found in file:\n${topTypes || "None"}`);
+        document.getElementById('data-status-tag').textContent = "No Recent Data";
         document.getElementById('data-status-tag').className = "text-[10px] text-rose-400 font-bold";
         return;
       }
-
+    
       if (deepCount > 0) {
         const avgDeep = deepTotalMins / deepCount;
         userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
       }
-
+    
       if (remCount > 0) {
         const avgRem = remTotalMins / remCount;
         userSleepProfile.lateRemEnd = Math.min(85, Math.max(55, Math.round(35 + avgRem)));
       }
-
+    
       userSleepProfile.isCalibrated = true;
-
-      document.getElementById('data-status-tag').textContent = "Apple Health Active";
+    
+      document.getElementById('data-status-tag').textContent = "Last 30 Days Active";
       document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
-      document.getElementById('auto-badge-text').textContent = "Calibrated to Apple Health Data";
+      document.getElementById('auto-badge-text').textContent = "Calibrated to Last 30 Days";
       document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
-      document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated Apple Health Architecture · Dynamic Cycles";
-
+      document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated to Recent 30-Day Sleep Architecture";
+    
       updateCalculations(true);
-      alert(`Success! Found ${sleepTagMatches} sleep records and calibrated your app settings!`);
+      alert(`Success! Processed ${sleepTagMatches} sleep entries from the past 30 days.`);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
