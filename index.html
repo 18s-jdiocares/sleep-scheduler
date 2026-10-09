@@ -266,7 +266,7 @@
         </div>
       </div>
 
-      <!-- NEW: Avoid Bedtime Hazard Window Banner -->
+      <!-- Avoid Bedtime Hazard Window Banner -->
       <div id="hazard-banner" class="glossy-banner-hazard rounded-xl p-5 backdrop-blur-md">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -385,14 +385,15 @@
 
   <!-- App Script Engine -->
   <script>
+    // Dynamic Sleep Profile (Calibrated directly via Apple Health XML)
     let userSleepProfile = {
-      avgLatency: 15,
-      earlyCycleLen: 95,
-      lateCycleLen: 90,
-      earlyDeepStart: 20,
-      earlyDeepEnd: 55,
-      lateRemStart: 35,
-      lateRemEnd: 80,
+      avgLatency: 15,          // Average fall-asleep latency (mins)
+      earlyCycleLen: 95,       // Cycle length for early-night cycles 1–3
+      lateCycleLen: 90,        // Cycle length for late-night cycles 4–6
+      earlyDeepStart: 20,      // Start of Deep Sleep (Stage N3) in early cycles
+      earlyDeepEnd: 55,        // End of Deep Sleep in early cycles
+      lateRemStart: 35,        // Start of REM Sleep in late cycles
+      lateRemEnd: 80,          // End of REM Sleep in late cycles
       isCalibrated: false
     };
 
@@ -404,10 +405,12 @@
       early: "Early Cycle Exit. Wakes before deep sleep (N3) begins in early cycles (1–3) to prevent heavy brain fog."
     };
 
+    // 1. Dynamic Cycle Length Helper based on Cycle Position
     function getCycleLength(cycleIndex) {
       return cycleIndex <= 3 ? userSleepProfile.earlyCycleLen : userSleepProfile.lateCycleLen;
     }
 
+    // 2. Calculates exact Night Sleep Duration using profile parameters
     function calculateDurationMinutes(cycles, variant) {
       let total = userSleepProfile.avgLatency;
 
@@ -433,7 +436,7 @@
       return total;
     }
 
-    // Calculates the duration that forces waking during the bad inertia zone (15m-35m of final cycle)
+    // 3. Calculates exact Avoid/Hazard Duration using profile deep-sleep parameters
     function calculateHazardDurationMinutes(cycles) {
       let total = userSleepProfile.avgLatency;
 
@@ -442,8 +445,12 @@
         if (c < cycles) {
           total += cLen;
         } else {
-          // Target minute 25 of the final cycle (peak inertia zone)
-          total += 25; 
+          // Targets the mid-point of the calibrated deep sleep / high inertia zone
+          if (c <= 3) {
+            total += Math.round((userSleepProfile.earlyDeepStart + userSleepProfile.earlyDeepEnd) / 2);
+          } else {
+            total += 25; // Standard N2 entry hazard in late cycles
+          }
         }
       }
       return total;
@@ -657,6 +664,7 @@
       }
     }
 
+    // 4. Master Calculation & Timeline Synchronization
     function updateCalculations(isWakeTimeChange = false) {
       const selectVal = document.getElementById('wake-time-select').value;
       let wakeVal = selectVal;
@@ -680,7 +688,7 @@
       const cycles = parseInt(cycleSelect.value);
       const variant = variantSelect.value;
 
-      // Recommended Bedtime Calculation
+      // Recommended Bedtime Window & Night Sleep Duration
       const durationMinutes = calculateDurationMinutes(cycles, variant);
 
       let midBedtimeMinutes = (wakeTotalMinutes - durationMinutes) % 1440;
@@ -697,13 +705,12 @@
       const endHour = Math.floor(endBedtimeMinutes / 60);
       const endMin = endBedtimeMinutes % 60;
 
-      const timeRangeStr = `${formatTime12(startHour, startMin)} – ${formatTime12(endHour, endMin)}`;
-      document.getElementById('bedtime-display').textContent = timeRangeStr;
+      document.getElementById('bedtime-display').textContent = `${formatTime12(startHour, startMin)} – ${formatTime12(endHour, endMin)}`;
       document.getElementById('duration-display').textContent = formatDuration(durationMinutes);
       document.getElementById('minute-count').textContent = `(${durationMinutes} total mins in bed)`;
       document.getElementById('strategy-desc').textContent = VARIANT_DESCS[variant];
 
-      // NEW: Avoid Bedtime Hazard Window Calculation
+      // Avoid Falling Asleep Hazard Window Calculation
       const hazardDurationMins = calculateHazardDurationMinutes(cycles);
       let midHazardBedtime = (wakeTotalMinutes - hazardDurationMins) % 1440;
       if (midHazardBedtime < 0) midHazardBedtime += 1440;
@@ -719,8 +726,7 @@
       const hEndHour = Math.floor(endHazardBedtime / 60);
       const hEndMin = endHazardBedtime % 60;
 
-      const avoidRangeStr = `${formatTime12(hStartHour, hStartMin)} – ${formatTime12(hEndHour, hEndMin)}`;
-      document.getElementById('avoid-bedtime-display').textContent = avoidRangeStr;
+      document.getElementById('avoid-bedtime-display').textContent = `${formatTime12(hStartHour, hStartMin)} – ${formatTime12(hEndHour, hEndMin)}`;
 
       const safetyBadge = document.getElementById('safety-badge');
       if (variant === 'full') {
@@ -756,6 +762,7 @@
       renderNapStrategy(cycles, wakeTotalMinutes);
     }
 
+    // 5. Streaming Parser: Updates Profile from last 30 days of Apple Health Data
     async function processStreamingAppleHealthXML(file) {
       const CHUNK_SIZE = 1024 * 64;
       let offset = 0;
@@ -818,12 +825,7 @@
         }
 
         const lastPos = textToScan.lastIndexOf('<');
-        if (lastPos !== -1 && lastPos > textToScan.length - 250) {
-          leftover = textToScan.slice(lastPos);
-        } else {
-          leftover = "";
-        }
-
+        leftover = (lastPos !== -1 && lastPos > textToScan.length - 250) ? textToScan.slice(lastPos) : "";
         offset += CHUNK_SIZE;
       }
 
@@ -840,6 +842,7 @@
         return;
       }
 
+      // Recalibrate sleep profile parameters directly from real data
       if (deepCount > 0) {
         const avgDeep = deepTotalMins / deepCount;
         userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
@@ -856,10 +859,11 @@
       document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
       document.getElementById('auto-badge-text').textContent = "Calibrated to Last 30 Days";
       document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
-      document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated to Recent 30-Day Sleep Architecture";
+      document.getElementById('app-params-subtitle').textContent = `Parameters: Calibrated (${userSleepProfile.earlyDeepEnd}m Deep / ${userSleepProfile.lateRemEnd}m REM)`;
 
+      // Single-source update forces all UI displays to recalculate in sync
       updateCalculations(true);
-      alert(`Success! Processed ${sleepTagMatches} sleep entries from the past 30 days.`);
+      alert(`Success! All sleep parameters, bedtime windows, and timelines calibrated using ${sleepTagMatches} sleep entries.`);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
