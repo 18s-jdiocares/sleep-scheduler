@@ -704,33 +704,37 @@
     // Process Apple Health Sleep XML Records
     function processAppleHealthXML(xmlText) {
       try {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-        
-        // Look for all records matching SleepAnalysis
-        const records = xmlDoc.querySelectorAll('Record[type*="SleepAnalysis"]');
+        // Check if user uploaded export_cda.xml by mistake
+        if (xmlText.includes('ClinicalDocument') && !xmlText.includes('HealthData')) {
+          alert("It looks like you uploaded 'export_cda.xml'. Please upload 'export.xml' from the extracted folder instead!");
+          return;
+        }
     
-        if (!records || records.length === 0) {
-          alert("No 'HKCategoryTypeIdentifierSleepAnalysis' records found in this XML file.");
+        // Direct Regex match to extract all SleepAnalysis record tags regardless of XML namespace
+        const recordRegex = /<Record[^>]*type=["'](?:HKCategoryTypeIdentifierSleepAnalysis|SleepAnalysis)["'][^>]*>/gi;
+        const matches = xmlText.match(recordRegex);
+    
+        if (!matches || matches.length === 0) {
+          alert("No sleep records found in this file. Make sure you are uploading 'export.xml' from your Apple Health export.");
           return;
         }
     
         let deepCount = 0, deepTotalMins = 0;
         let remCount = 0, remTotalMins = 0;
     
-        records.forEach(r => {
-          const val = (r.getAttribute('value') || '').toLowerCase();
-          const startStr = r.getAttribute('startDate');
-          const endStr = r.getAttribute('endDate');
+        matches.forEach(recordTag => {
+          // Extract value, startDate, and endDate attributes
+          const valMatch = recordTag.match(/value=["']([^"']+)["']/i);
+          const startMatch = recordTag.match(/startDate=["']([^"']+)["']/i);
+          const endMatch = recordTag.match(/endDate=["']([^"']+)["']/i);
     
-          if (startStr && endStr) {
-            const start = new Date(startStr);
-            const end = new Date(endStr);
+          if (startMatch && endMatch) {
+            const val = (valMatch ? valMatch[1] : '').toLowerCase();
+            const start = new Date(startMatch[1]);
+            const end = new Date(endMatch[1]);
             const duration = (end - start) / (1000 * 60);
     
-            // Filter out unreasonable durations or non-sleep records
             if (duration > 0 && duration < 720) {
-              // Checks both string names and Apple Health enum values
               if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
                 deepCount++;
                 deepTotalMins += duration;
@@ -743,7 +747,7 @@
         });
     
         if (deepCount === 0 && remCount === 0) {
-          alert(`Found ${records.length} sleep records, but none were tagged specifically as Deep or REM sleep (Apple Watch stage tracking requires watchOS 9+).`);
+          alert(`Found ${matches.length} sleep entries, but none were categorized into Deep/REM stages (Apple Watch sleep stage tracking requires watchOS 9+).`);
           return;
         }
     
@@ -766,13 +770,12 @@
         document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated Apple Health Architecture · Dynamic Cycles";
     
         updateCalculations(true);
-        alert(`Successfully processed ${records.length} sleep records! App parameters calibrated.`);
+        alert(`Success! Calibrated app parameters using ${matches.length} sleep records.`);
     
       } catch (err) {
-        alert("Unable to parse Apple Health XML. Ensure you upload export.xml directly.");
+        alert("Error reading file. Make sure you select export.xml directly.");
       }
-    }
-    
+    }    
     document.addEventListener('DOMContentLoaded', () => {
       updateCalculations(true);
 
