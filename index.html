@@ -81,16 +81,14 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 6px rgba(0,0,0,0.5) !important;
       border: 1px solid rgba(255, 255, 255, 0.2) !important;
       color: #ffffff !important;
-      color-scheme: dark !important; /* Force browser UI controls into dark mode */
+      color-scheme: dark !important;
     }
 
-    /* Fix dropdown option rendering across native OS dropdown lists */
     select.aero-select-dark option {
       background-color: #0f172a !important;
       color: #ffffff !important;
     }
 
-    /* Fix Custom Input Time Accent Colors */
     input[type="time"]::-webkit-calendar-picker-indicator {
       filter: invert(1) opacity(0.7);
       cursor: pointer;
@@ -100,14 +98,12 @@
       color: #ffffff !important;
     }
 
-    /* Banner Highlight */
     .glossy-banner {
       background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(16, 185, 129, 0.15) 100%);
       border: 1px solid rgba(255, 255, 255, 0.2);
       box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), 0 8px 24px rgba(0, 0, 0, 0.4);
     }
 
-    /* Ambient Bubbles */
     .bubble-dark {
       position: absolute;
       border-radius: 50%;
@@ -358,15 +354,14 @@
 
   <!-- App Script Engine -->
   <script>
-    // Personal adaptive sleep profile parameters
     let userSleepProfile = {
       avgLatency: 15,
-      earlyCycleLen: 95,      // Cycles 1–3 average length
-      lateCycleLen: 90,       // Cycles 4–6 average length
-      earlyDeepStart: 20,     // Deep sleep start in early cycles (mins)
-      earlyDeepEnd: 55,       // Deep sleep end in early cycles (mins)
-      lateRemStart: 35,       // REM start in late cycles (mins)
-      lateRemEnd: 80,         // REM end in late cycles (mins)
+      earlyCycleLen: 95,
+      lateCycleLen: 90,
+      earlyDeepStart: 20,
+      earlyDeepEnd: 55,
+      lateRemStart: 35,
+      lateRemEnd: 80,
       isCalibrated: false
     };
 
@@ -378,7 +373,6 @@
       early: "Early Cycle Exit. Wakes before deep sleep (N3) begins in early cycles (1–3) to prevent heavy brain fog."
     };
 
-    // Calculate duration considering early vs late cycle differences
     function getCycleLength(cycleIndex) {
       return cycleIndex <= 3 ? userSleepProfile.earlyCycleLen : userSleepProfile.lateCycleLen;
     }
@@ -391,20 +385,16 @@
         if (c < cycles) {
           total += cLen;
         } else {
-          // Final cycle exit rule
           if (variant === 'full') {
             total += cLen;
           } else if (variant === 'rem') {
             if (c <= 3) {
-              // Mid-exit early cycle: exit right after deep sleep phase
               total += Math.min(userSleepProfile.earlyDeepEnd + 10, cLen - 10);
             } else {
-              // Late cycle: exit mid-REM
               const remMid = Math.round((userSleepProfile.lateRemStart + userSleepProfile.lateRemEnd) / 2);
               total += remMid;
             }
           } else if (variant === 'early') {
-            // Exit early before deep sleep
             total += Math.max(15, userSleepProfile.earlyDeepStart - 5);
           }
         }
@@ -477,7 +467,6 @@
       const markerPct = Math.min(100, (exitOffset / cLen) * 100);
 
       if (isEarlyGroup) {
-        // Render Early Cycle Phase Layout (Front-loaded Deep Sleep)
         const p1 = (userSleepProfile.earlyDeepStart / cLen) * 100;
         const p2 = ((userSleepProfile.earlyDeepEnd - userSleepProfile.earlyDeepStart) / cLen) * 100;
         const p3 = 100 - p1 - p2;
@@ -495,7 +484,6 @@
           <span>${cLen}m (Cycle End)</span>
         `;
       } else {
-        // Render Late Cycle Phase Layout (Expanded REM, Minimal Deep)
         const p1 = (userSleepProfile.lateRemStart / cLen) * 100;
         const p2 = ((userSleepProfile.lateRemEnd - userSleepProfile.lateRemStart) / cLen) * 100;
         const p3 = 100 - p1 - p2;
@@ -701,81 +689,110 @@
       renderNapStrategy(cycles, wakeTotalMinutes);
     }
 
-    // Process Apple Health Sleep XML Records
-    function processAppleHealthXML(xmlText) {
-      try {
-        // Check if user uploaded export_cda.xml by mistake
-        if (xmlText.includes('ClinicalDocument') && !xmlText.includes('HealthData')) {
-          alert("It looks like you uploaded 'export_cda.xml'. Please upload 'export.xml' from the extracted folder instead!");
-          return;
+    // High-performance streaming chunk scanner for massive XML files
+    async function processStreamingAppleHealthXML(file) {
+      const CHUNK_SIZE = 1024 * 64; // 64KB per chunk
+      let offset = 0;
+      let totalBytes = file.size;
+      
+      let deepCount = 0, deepTotalMins = 0;
+      let remCount = 0, remTotalMins = 0;
+      let sleepTagMatches = 0;
+
+      const tagCounts = {};
+      let leftover = "";
+
+      document.getElementById('data-status-tag').textContent = "Scanning File...";
+      document.getElementById('data-status-tag').className = "text-[10px] text-amber-300 font-bold animate-pulse";
+
+      while (offset < totalBytes) {
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        const chunkText = await slice.text();
+        const textToScan = leftover + chunkText;
+
+        // Diagnostic tag tracker
+        const tagMatches = textToScan.match(/<Record[^>]*type=["']([^"']+)["']/gi);
+        if (tagMatches) {
+          tagMatches.forEach(tm => {
+            const typeVal = tm.replace(/<Record[^>]*type=["']/i, '').replace(/["']$/, '');
+            tagCounts[typeVal] = (tagCounts[typeVal] || 0) + 1;
+          });
         }
-    
-        // Direct Regex match to extract all SleepAnalysis record tags regardless of XML namespace
-        const recordRegex = /<Record[^>]*type=["'](?:HKCategoryTypeIdentifierSleepAnalysis|SleepAnalysis)["'][^>]*>/gi;
-        const matches = xmlText.match(recordRegex);
-    
-        if (!matches || matches.length === 0) {
-          alert("No sleep records found in this file. Make sure you are uploading 'export.xml' from your Apple Health export.");
-          return;
-        }
-    
-        let deepCount = 0, deepTotalMins = 0;
-        let remCount = 0, remTotalMins = 0;
-    
-        matches.forEach(recordTag => {
-          // Extract value, startDate, and endDate attributes
-          const valMatch = recordTag.match(/value=["']([^"']+)["']/i);
-          const startMatch = recordTag.match(/startDate=["']([^"']+)["']/i);
-          const endMatch = recordTag.match(/endDate=["']([^"']+)["']/i);
-    
-          if (startMatch && endMatch) {
-            const val = (valMatch ? valMatch[1] : '').toLowerCase();
-            const start = new Date(startMatch[1]);
-            const end = new Date(endMatch[1]);
-            const duration = (end - start) / (1000 * 60);
-    
-            if (duration > 0 && duration < 720) {
-              if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
-                deepCount++;
-                deepTotalMins += duration;
-              } else if (val.includes('rem') || val.includes('asleeprem') || val === '4') {
-                remCount++;
-                remTotalMins += duration;
+
+        // Broad sleep scanner matching all Apple Health sleep formats
+        const recordMatches = textToScan.match(/<Record[^>]*SleepAnalysis[^>]*>/gi);
+        if (recordMatches) {
+          sleepTagMatches += recordMatches.length;
+          recordMatches.forEach(tag => {
+            const valMatch = tag.match(/value=["']([^"']+)["']/i);
+            const startMatch = tag.match(/startDate=["']([^"']+)["']/i);
+            const endMatch = tag.match(/endDate=["']([^"']+)["']/i);
+
+            if (startMatch && endMatch) {
+              const val = (valMatch ? valMatch[1] : '').toLowerCase();
+              const start = new Date(startMatch[1]);
+              const end = new Date(endMatch[1]);
+              const duration = (end - start) / (1000 * 60);
+
+              if (duration > 0 && duration < 720) {
+                if (val.includes('deep') || val.includes('asleepdeep') || val === '2') {
+                  deepCount++;
+                  deepTotalMins += duration;
+                } else if (val.includes('rem') || val.includes('asleeprem') || val === '4') {
+                  remCount++;
+                  remTotalMins += duration;
+                }
               }
             }
-          }
-        });
-    
-        if (deepCount === 0 && remCount === 0) {
-          alert(`Found ${matches.length} sleep entries, but none were categorized into Deep/REM stages (Apple Watch sleep stage tracking requires watchOS 9+).`);
-          return;
+          });
         }
-    
-        if (deepCount > 0) {
-          const avgDeep = deepTotalMins / deepCount;
-          userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
+
+        // Carry over last incomplete tag boundary
+        const lastPos = textToScan.lastIndexOf('<');
+        if (lastPos !== -1 && lastPos > textToScan.length - 250) {
+          leftover = textToScan.slice(lastPos);
+        } else {
+          leftover = "";
         }
-    
-        if (remCount > 0) {
-          const avgRem = remTotalMins / remCount;
-          userSleepProfile.lateRemEnd = Math.min(85, Math.max(55, Math.round(35 + avgRem)));
-        }
-    
-        userSleepProfile.isCalibrated = true;
-        
-        document.getElementById('data-status-tag').textContent = "Apple Health Active";
-        document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
-        document.getElementById('auto-badge-text').textContent = "Calibrated to Apple Health Data";
-        document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
-        document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated Apple Health Architecture · Dynamic Cycles";
-    
-        updateCalculations(true);
-        alert(`Success! Calibrated app parameters using ${matches.length} sleep records.`);
-    
-      } catch (err) {
-        alert("Error reading file. Make sure you select export.xml directly.");
+
+        offset += CHUNK_SIZE;
       }
-    }    
+
+      if (sleepTagMatches === 0) {
+        const topTypes = Object.entries(tagCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([type, count]) => `• ${type} (${count} entries)`)
+          .join('\n');
+
+        alert(`Scanned entire file, but no SleepAnalysis records were found.\n\nTop health categories found in your file:\n${topTypes || "None (File might be empty or formatted differently)"}\n\nMake sure your Apple Health export includes sleep data!`);
+        document.getElementById('data-status-tag').textContent = "No Sleep Data";
+        document.getElementById('data-status-tag').className = "text-[10px] text-rose-400 font-bold";
+        return;
+      }
+
+      if (deepCount > 0) {
+        const avgDeep = deepTotalMins / deepCount;
+        userSleepProfile.earlyDeepEnd = Math.min(65, Math.max(35, Math.round(20 + avgDeep)));
+      }
+
+      if (remCount > 0) {
+        const avgRem = remTotalMins / remCount;
+        userSleepProfile.lateRemEnd = Math.min(85, Math.max(55, Math.round(35 + avgRem)));
+      }
+
+      userSleepProfile.isCalibrated = true;
+
+      document.getElementById('data-status-tag').textContent = "Apple Health Active";
+      document.getElementById('data-status-tag').className = "text-[10px] text-purple-300 font-bold";
+      document.getElementById('auto-badge-text').textContent = "Calibrated to Apple Health Data";
+      document.getElementById('auto-badge-dot').className = "w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse";
+      document.getElementById('app-params-subtitle').textContent = "Parameters: Calibrated Apple Health Architecture · Dynamic Cycles";
+
+      updateCalculations(true);
+      alert(`Success! Found ${sleepTagMatches} sleep records and calibrated your app settings!`);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       updateCalculations(true);
 
@@ -790,9 +807,7 @@
       fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => processAppleHealthXML(evt.target.result);
-        reader.readAsText(file);
+        processStreamingAppleHealthXML(file);
       });
 
       selectEl.addEventListener('change', () => {
